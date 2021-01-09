@@ -12,11 +12,16 @@ const Home: React.FC<IHomeProps> = ({ error }) => {
   return (
     <div>
       <p>hello oauth2</p>
-      <button onClick={() => {
-        window.location.href = url;
-      }}>login with discord</button>
+      <button
+        onClick={() => {
+          window.location.href = url;
+        }}
+      >
+        login with discord
+      </button>
+      {error ? <p>{error}</p> : null}
     </div>
   );
-}
+};
 
 export default Home;

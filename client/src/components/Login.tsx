@@ -1,25 +1,42 @@
 import React, { Dispatch, useEffect } from "react";
 import { useHistory } from "react-router-dom";
 import axios, { AxiosError } from "axios";
+import decode from "jwt-decode";
+import { IUser } from "../models";
 
 import { SERVER_URL } from "../constants";
 
 interface IHomeProps {
-  setAccessToken: Dispatch<string | null>
-  setError: Dispatch<string | null>
+  setUser: Dispatch<IUser | null>;
+  setError: Dispatch<string | null>;
 }
 
-const Home: React.FC<IHomeProps> = ({ setAccessToken, setError }) => {
+interface IDecodedJWT {
+  userId: string;
+  exp: number;
+  iat: number;
+}
+
+const Home: React.FC<IHomeProps> = ({ setUser, setError }) => {
   let history = useHistory();
 
   useEffect(() => {
     const code = new URLSearchParams(window.location.search).get("code");
-    
+
     if (code) {
       axios
-        .post(`${SERVER_URL}/login/discord`, { code }, { headers: { "Content-Type": "application/json" }})
+        .post(`${SERVER_URL}/login/discord`, { code }, { headers: { "Content-Type": "application/json" } })
         .then(({ data }) => {
-          setAccessToken(data.accessToken);
+          if (data.user) {
+            setUser(data.user);
+          }
+
+          const decoded: IDecodedJWT = decode(data.accessToken);
+
+          if (decoded.exp) {
+            document.cookie = `token=${data.accessToken}; expires=${new Date(decoded.exp * 1000).toUTCString()}`;
+          }
+
           history.replace("/profile");
         })
         .catch((err: AxiosError) => {
@@ -36,13 +53,13 @@ const Home: React.FC<IHomeProps> = ({ setAccessToken, setError }) => {
       setError("Error logging in with Discord, please try again later");
       history.replace("/");
     }
-  }, [setAccessToken, setError, history]);
+  }, [setUser, setError, history]);
 
   return (
     <div>
       <p>loading...</p>
     </div>
   );
-}
+};
 
 export default Home;

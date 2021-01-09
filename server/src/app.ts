@@ -1,56 +1,35 @@
 if (process.env.NODE_ENV !== "production") require("dotenv").config();
 
-import axios, { AxiosError } from "axios";
-import btoa from "btoa";
+import fs from "fs";
+import path from "path";
 import cors from "cors";
 import bodyParser from "body-parser";
-import express, {Request, Response} from "express";
-import { URLSearchParams } from "url";
+import express from "express";
+import mongoose, { model } from "mongoose";
+import morgan from "morgan";
+
+import authenticateToken from "./middleware/authenticateToken";
+
+import loginWithDiscord from "./routes/loginWithDiscord";
+import getSelf from "./routes/getSelf";
+
+mongoose.connect(`mongodb+srv://${process.env.MONGO_USERNAME}:${process.env.MONGO_PASSWORD}@${process.env.MONGO_HOST}/${process.env.MONGO_DBNAME}?retryWrites=true&w=majority`, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
 
 const app = express();
 
-app.use(cors());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
-app.post("/login/discord", (req: Request, res: Response) => {
-  const code = req.body.code;
+app.use(cors());
 
-  const params = new URLSearchParams();
-  params.append("grant_type", "authorization_code");
-  params.append("code", code);
-  params.append("redirect_uri", "http://localhost:3000/login");
+app.use(morgan("dev"));
+app.use(morgan("combined", { stream: fs.createWriteStream(path.join(__dirname, "access.log"), { flags: "a" }) }));
 
-  const creds = btoa(`${process.env.CLIENT_ID}:${process.env.CLIENT_SECRET}`);
-
-  if (code) {
-    axios
-      .post(`https://discordapp.com/api/oauth2/token`, params, { headers: { Authorization: `Basic ${creds}` }})
-      .then(({ data }) => {
-        res.status(200).json({
-          accessToken: data.access_token
-        })
-      })
-      .catch((err: AxiosError) => {
-        if (err.response) {
-          res.status(401).json({
-            error: "Invalid Request",
-            message: err.response.data.error_description ? err.response.data.error_description : "Discord API error"
-          });
-        } else {
-          res.status(500).json({
-            error: "Internal Server Error",
-            message: "Internal server error"
-          });
-        }
-      });
-  } else {
-    res.status(400).json({
-      error: "Bad Request",
-      message: 'Missing "code" in request'
-    });
-  }
-});
+app.post("/login/discord", loginWithDiscord);
+app.get("/profile", authenticateToken, getSelf);
 
 app.listen(process.env.PORT, () => {
   console.log(`HTTP listening on ${process.env.PORT}`);
